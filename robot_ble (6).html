@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROBOT BLE</title>
+<style>
+:root{--bg:#05060a;--card:#0d0e17;--bd:#1c1e2e;--tx:#e6e8f0;--mut:#6b6f86;--g:#00ff88;--r:#ff3b5c;--y:#ffd23f;--c:#19d3da}
+*{box-sizing:border-box}
+body{margin:0;padding:16px;background:var(--bg);color:var(--tx);font:14px 'JetBrains Mono',ui-monospace,Consolas,monospace}
+.w{max-width:700px;margin:auto;display:grid;gap:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px}
+h1{margin:0;font-size:16px;letter-spacing:.2em;color:var(--g)}
+h3{margin:0 0 12px;font-size:12px;letter-spacing:.2em;color:var(--mut);font-weight:400}
+.top{display:flex;justify-content:space-between;align-items:center}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--r);margin-right:6px;vertical-align:-1px}
+.dot.on{background:var(--g);box-shadow:0 0 8px var(--g)}
+.mut{color:var(--mut);font-size:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.tile{background:#07080e;border:1px solid var(--bd);border-radius:12px;padding:10px 14px}
+.tile small{display:block;font-size:10px;color:var(--mut);margin-bottom:4px}
+.tile b{font-size:22px}
+button{font:inherit;background:transparent;border:1px solid;border-radius:12px;padding:16px;cursor:pointer;color:var(--g);border-color:#0a6b45}
+button:hover:not(:disabled){background:#ffffff0a}
+button:disabled{opacity:.35;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:2px solid var(--c);outline-offset:2px}
+.b-c{color:var(--c);border-color:#0e6f73}.b-r{color:var(--r);border-color:#7a1d31}
+#conn{width:100%;border-color:var(--g)}
+#estop{width:100%;padding:20px;background:#2a0a12;color:var(--r);border-color:var(--r)}
+.cells{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:6px}
+.cell{height:30px;border-radius:6px;background:#151724;transition:background .08s}
+.cell.on{background:var(--g);box-shadow:0 0 10px #00ff8888}
+.lbls{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin:6px 0 12px;text-align:center;font-size:10px;color:var(--mut)}
+.pill{display:inline-block;padding:3px 12px;border-radius:99px;border:1px solid;font-size:13px}
+.c0{color:var(--r)}.c1{color:var(--g)}.c2{color:var(--y)}
+.barw{height:6px;background:#151724;border-radius:4px;margin:12px 0;overflow:hidden}
+#bar{height:100%;width:0;background:var(--g)}
+label{display:block;font-size:11px;color:var(--mut);margin-bottom:4px}
+input[type=number]{width:100%;background:#07080e;border:1px solid var(--bd);border-radius:10px;padding:10px;color:var(--tx);font:inherit}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:260px;margin:12px auto}
+.pad button{padding:18px 0;font-size:18px}
+#log{height:110px;overflow:auto;font-size:12px;color:var(--mut);white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div class="w">
+  <div class="card top"><h1>ROBOT BLE</h1><span class="mut"><i class="dot" id="dot"></i><span id="ctext">Chưa kết nối</span></span></div>
+  <button id="conn">⚡ Kết nối BLE</button>
+
+  <div class="card">
+    <h3>Trạng thái</h3>
+    <div class="g2">
+      <div class="tile"><small>Mode</small><b id="mode" style="color:var(--g)">IDLE</b></div>
+      <div class="tile"><small>Case</small><b id="case" style="color:var(--c)">-</b></div>
+      <div class="tile"><small>Position</small><b id="pos" style="color:var(--y)">5500</b></div>
+      <div class="tile"><small>Error</small><b id="err" style="color:var(--r)">0</b></div>
+    </div>
+    <p class="mut" style="margin:14px 0 0">Cảm biến (1 → 12)</p>
+    <div class="cells" id="cells"></div>
+    <div class="lbls" id="lbls"></div>
+    <div class="g2" style="align-items:center">
+      <button data-need id="test">Test cảm biến</button>
+      <label style="margin:0;display:flex;gap:8px;align-items:center"><input type="checkbox" id="inv"> Đảo chiều hiển thị</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Calibrate &amp; chạy</h3>
+    <div class="g3">
+      <button data-need id="cal" class="b-c">① Calib</button>
+      <button data-need id="run">② Chạy</button>
+      <button data-need id="stop" class="b-r">■ Dừng</button>
+    </div>
+    <p class="mut" style="margin:12px 0 0">Calib: <span class="pill c0" id="pill">Chưa calib</span></p>
+    <div class="barw"><div id="bar"></div></div>
+    <p class="mut" style="margin:0">Bấm Calib rồi lướt cả 12 mắt qua vạch và nền trong 5 giây. Báo “Đã calib” thì nút Chạy mới mở.</p>
+  </div>
+
+  <div class="card">
+    <h3>Chỉnh PID</h3>
+    <div class="g3">
+      <div><label>Kp</label><input type="number" id="kp" step="0.001" value="0.025"></div>
+      <div><label>Kd</label><input type="number" id="kd" step="0.01" value="0.2"></div>
+      <div><label>Base (0-255)</label><input type="number" id="base" value="120"></div>
+      <div><label>Cua: bánh ngoài +</label><input type="number" id="tout" value="70"></div>
+      <div><label>Cua: bánh trong −</label><input type="number" id="tin" value="90"></div>
+    </div>
+    <div class="g2" style="margin-top:12px">
+      <button data-need id="sendpid">Gửi PID</button>
+      <button data-need id="getpid" class="b-c">Đọc PID</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Điều khiển tay</h3>
+    <div class="pad">
+      <span></span><button data-need data-cmd="FWD">▲</button><span></span>
+      <button data-need data-cmd="LFT">◀</button><button data-need data-cmd="STP" class="b-r">■</button><button data-need data-cmd="RGT">▶</button>
+      <span></span><button data-need data-cmd="BWD">▼</button><span></span>
+    </div>
+    <label>Tốc độ tay: <span id="spdv">120</span></label>
+    <input type="range" id="spd" min="30" max="255" value="120" style="width:100%">
+  </div>
+
+  <button data-need id="estop">■ Dừng khẩn cấp</button>
+  <div class="card"><h3>Nhật ký</h3><div id="log"></div></div>
+  <p class="mut" style="text-align:center">Mở bằng Chrome hoặc Edge (Web Bluetooth). Firmware: main.cpp</p>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const SVC='6e400001-b5a3-f393-e0a9-e50e24dcca9e',RXU='6e400002-b5a3-f393-e0a9-e50e24dcca9e',TXU='6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+const N=12,enc=new TextEncoder(),dec=new TextDecoder();
+let dev=null,rx=null,buf='',pat='0'.repeat(N),raw=null,calT=null,q=Promise.resolve();
+const cells=$('cells'),lbls=$('lbls');
+for(let i=0;i<N;i++){cells.insertAdjacentHTML('beforeend','<div class="cell"></div>');lbls.insertAdjacentHTML('beforeend','<span>-</span>')}
+
+function drawPat(){
+  const inv=$('inv').checked;
+  [...cells.children].forEach((c,i)=>{const k=inv?N-1-i:i;c.classList.toggle('on',pat[k]==='1');lbls.children[i].textContent=raw?raw[k]:'-'});
+}
+function log(m){const l=$('log');l.textContent+=new Date().toLocaleTimeString()+'  '+m+'\n';l.scrollTop=l.scrollHeight}
+function setConn(ok){
+  $('dot').classList.toggle('on',ok);$('ctext').textContent=ok?'Đã kết nối':'Chưa kết nối';
+  $('conn').textContent=ok?'Ngắt kết nối':'⚡ Kết nối BLE';
+  document.querySelectorAll('[data-need]').forEach(b=>b.disabled=!ok);
+  if(!ok){$('run').disabled=true;raw=null;drawPat()}
+}
+function send(c){if(!rx)return;q=q.then(()=>rx.writeValueWithoutResponse(enc.encode(c))).catch(e=>log('Gửi lỗi: '+e.message))}
+function startBar(){
+  const t0=Date.now();clearInterval(calT);
+  calT=setInterval(()=>{const p=Math.min(100,(Date.now()-t0)/50);$('bar').style.width=p+'%';if(p>=100)clearInterval(calT)},50);
+}
+function status(d){
+  $('mode').textContent=d.mode;$('case').textContent=d.case;$('pos').textContent=d.pos;$('err').textContent=d.err;
+  pat=d.pat;drawPat();
+  const p=$('pill');p.textContent=['Chưa calib','Đã calib','Đang calib…'][d.cal];p.className='pill c'+d.cal;
+  $('run').disabled=!(d.cal===1&&d.mode!=='AUTO');
+  if(d.cal!==2&&!calT)$('bar').style.width=d.cal===1?'100%':'0';
+}
+function onData(t){
+  buf=/^[{LRP]/.test(t)?t:buf+t;
+  if(buf[0]==='{'){if(!buf.endsWith('}'))return;try{status(JSON.parse(buf))}catch(e){}}
+  else if(buf.startsWith('RAW:')){raw=buf.slice(4).split(',');drawPat()}
+  else if(buf.startsWith('PID:')){const v=buf.slice(4).split(',');['kp','kd','base','tout','tin'].forEach((k,i)=>{if(v[i]!==undefined)$(k).value=v[i]})}
+  else if(buf.startsWith('LOG:')){
+    log(buf.slice(4));
+    if(buf.startsWith('LOG:CAL_START')){calT=null;startBar()}
+    if(buf.startsWith('LOG:TEST_OFF')){raw=null;drawPat()}
+  }
+  buf='';
+}
+
+$('conn').onclick=async()=>{
+  if(dev&&dev.gatt.connected){dev.gatt.disconnect();return}
+  if(!navigator.bluetooth){log('Trình duyệt không hỗ trợ Web Bluetooth, hãy dùng Chrome hoặc Edge');return}
+  try{
+    dev=await navigator.bluetooth.requestDevice({filters:[{name:'ROBOT_BLE'}],optionalServices:[SVC]});
+    dev.addEventListener('gattserverdisconnected',()=>{rx=null;setConn(false);log('Mất kết nối')});
+    const s=await (await dev.gatt.connect()).getPrimaryService(SVC);
+    rx=await s.getCharacteristic(RXU);
+    const tx=await s.getCharacteristic(TXU);
+    await tx.startNotifications();
+    tx.addEventListener('characteristicvaluechanged',e=>onData(dec.decode(e.target.value)));
+    setConn(true);send('GETPID');
+  }catch(e){log('Lỗi kết nối: '+e.message)}
+};
+$('cal').onclick=()=>send('CAL');
+$('run').onclick=()=>send('AUTO');
+$('stop').onclick=()=>{send('MANUAL');send('STP')};
+$('estop').onclick=()=>{send('MANUAL');send('STP')};
+$('test').onclick=()=>send('TEST');
+$('inv').onchange=drawPat;
+$('getpid').onclick=()=>send('GETPID');
+$('sendpid').onclick=()=>{send(`PID:${$('kp').value},${$('kd').value},${$('base').value}`);send(`TURN:${$('tout').value},${$('tin').value}`)};
+$('spd').oninput=e=>$('spdv').textContent=e.target.value;
+$('spd').onchange=e=>send('SPD:'+e.target.value);
+document.querySelectorAll('[data-cmd]').forEach(b=>{
+  const c=b.dataset.cmd;
+  b.onpointerdown=()=>send(c);
+  if(c!=='STP'){b.onpointerup=b.onpointerleave=()=>send('STP')}
+});
+setConn(false);
+</script>
+</body>
+</html>
